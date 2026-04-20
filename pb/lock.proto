@@ -1,0 +1,29 @@
+syntax = "proto3";
+
+package pb;
+option go_package = "lockservice/pb";
+
+// LockRequest 代表所有的請求輸入
+message LockRequest {
+  string key = 1;
+  string token = 2;
+  int32 ttl_sec = 3;
+}
+
+// LockResponse 代表鎖的資訊
+message LockResponse {
+  string key = 1;
+  string token = 2;
+  int64 expired_at = 3; // Unix timestamp
+}
+
+// ActionResponse 代表單純的操作結果
+message ActionResponse {
+  string status = 1;
+}
+
+service LockService {
+  rpc Acquire(LockRequest) returns (LockResponse);
+  rpc Release(LockRequest) returns (ActionResponse);
+  rpc Extend(LockRequest) returns (ActionResponse);
+}
