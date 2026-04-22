@@ -7,7 +7,7 @@
   - [ ] Python SDK (`sdk/python/`) — 測試腳本已存在，client 尚未完成
   - [ ] Node.js / TypeScript SDK
 - [ ] **gRPC Buf Tool** — 導入 `buf` 管理 `.proto`，取代手動 `protoc`
-- [ ] **Support PostgreSQL / MySQL** — RDBMS backend (`UPDATE WHERE key = ? AND token = ?`)
+- [x] **Support PostgreSQL / MySQL** — RDBMS backend (`UPDATE WHERE key = ? AND token = ?`)
 - [ ] **Swagger / OpenAPI** — 為 HTTP API 產生文件 (`/api/v1/lock` 等)
 
 ## 📊 可觀測性 (Observability)
