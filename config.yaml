@@ -1,0 +1,22 @@
+# Lock Service Configuration
+
+server:
+  http_port: ":8080"
+  grpc_port: ":50051"
+
+# backend: redis | dynamodb | postgres | mysql
+backend: "redis"
+
+redis:
+  addr: "localhost:16379"
+
+dynamodb:
+  table_name: "locks"
+  region: "us-east-1"
+  endpoint: "" # 留空表示使用 AWS 預設端點；可填入 http://localhost:4566 供本地測試
+
+sql:
+  # postgres DSN 範例: postgres://user:password@localhost:5432/dbname?sslmode=disable
+  # mysql  DSN 範例: user:password@tcp(localhost:3306)/dbname?parseTime=true
+  dsn: ""
+  dialect: "postgres" # postgres | mysql
