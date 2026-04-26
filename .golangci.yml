@@ -1,0 +1,53 @@
+version: "2"
+
+run:
+  timeout: 5m
+
+formatters:
+  enable:
+    - gci
+    - gofmt
+    - gofumpt
+    - goimports
+    - golines
+    - swaggo
+  settings:
+    gofmt:
+      rewrite-rules:
+        - pattern: "interface{}"
+          replacement: "any"
+    gofumpt:
+      extra-rules: true
+  exclusions:
+    paths: []
+
+linters:
+  default: standard          # errcheck, govet, gosimple, staticcheck, unused, ineffassign
+  enable:
+    - revive                 # opinionated but pragmatic style checks
+    - misspell               # typos in comments/strings
+    - bodyclose              # ensure http.Response.Body is closed
+    - noctx                  # http.NewRequest without context
+
+  settings:
+    errcheck:
+      # Ignore unactionable writes to http.ResponseWriter.
+      # If the connection is already broken there's nothing to do.
+      exclude-functions:
+        - (net/http.ResponseWriter).Write
+        - (*encoding/json.Encoder).Encode
+
+    revive:
+      rules:
+        - name: exported
+          disabled: true     # pb/ generated code has inconsistent doc comments
+
+issues:
+  exclude-rules:
+    # Test files: relax errcheck and a few noisy rules
+    - path: _test\.go
+      linters: [errcheck, revive]
+
+    # Generated protobuf files
+    - path: pb/
+      linters: [revive, staticcheck, unused]

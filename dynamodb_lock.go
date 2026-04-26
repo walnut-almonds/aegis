@@ -48,7 +48,6 @@ func (s *DynamoDBLockStore) Acquire(req LockRequest) (*Lock, error) {
 			":now": &types.AttributeValueMemberN{Value: strconv.FormatInt(nowUnix, 10)},
 		},
 	})
-
 	if err != nil {
 		var condFailedErr *types.ConditionalCheckFailedException
 		if errors.As(err, &condFailedErr) {
@@ -81,7 +80,6 @@ func (s *DynamoDBLockStore) Release(req LockRequest) error {
 			":tok": &types.AttributeValueMemberS{Value: req.Token},
 		},
 	})
-
 	if err != nil {
 		var condFailedErr *types.ConditionalCheckFailedException
 		if errors.As(err, &condFailedErr) {
@@ -114,7 +112,6 @@ func (s *DynamoDBLockStore) Extend(req LockRequest) error {
 			":tok": &types.AttributeValueMemberS{Value: req.Token},
 		},
 	})
-
 	if err != nil {
 		var condFailedErr *types.ConditionalCheckFailedException
 		if errors.As(err, &condFailedErr) {

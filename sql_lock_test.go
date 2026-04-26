@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 	"net"
@@ -12,18 +13,18 @@ import (
 	"github.com/dolthub/go-mysql-server/server"
 	gsql "github.com/dolthub/go-mysql-server/sql"
 	embeddedpostgres "github.com/fergusstrange/embedded-postgres"
-
 	_ "github.com/go-sql-driver/mysql"
 	_ "github.com/lib/pq"
 )
 
 // freePort 動態找一個可用的 TCP 埠
 func freePort() int {
-	l, err := net.Listen("tcp", "localhost:0")
+	var lc net.ListenConfig
+	l, err := lc.Listen(context.Background(), "tcp", "localhost:0")
 	if err != nil {
 		panic(fmt.Sprintf("freePort: %v", err))
 	}
-	defer l.Close()
+	defer func() { _ = l.Close() }()
 	return l.Addr().(*net.TCPAddr).Port
 }
 
@@ -57,7 +58,7 @@ func setupPostgres(t *testing.T) *SQLLockStore {
 	if err != nil {
 		t.Fatalf("failed to open embedded postgres db: %v", err)
 	}
-	t.Cleanup(func() { db.Close() })
+	t.Cleanup(func() { _ = db.Close() })
 
 	store, err := NewSQLLockStore(db, DialectPostgres)
 	if err != nil {
@@ -87,7 +88,7 @@ func setupMySQL(t *testing.T) *SQLLockStore {
 		t.Fatalf("failed to create go-mysql-server: %v", err)
 	}
 	go func() { _ = s.Start() }()
-	t.Cleanup(func() { s.Close() })
+	t.Cleanup(func() { _ = s.Close() })
 
 	// 等待 server 啟動（最多 2 秒）
 	dsn := fmt.Sprintf("root:@tcp(localhost:%d)/%s?parseTime=true", port, dbName)
@@ -95,11 +96,11 @@ func setupMySQL(t *testing.T) *SQLLockStore {
 	if err != nil {
 		t.Fatalf("failed to open in-memory mysql db: %v", err)
 	}
-	t.Cleanup(func() { db.Close() })
+	t.Cleanup(func() { _ = db.Close() })
 
 	db.SetConnMaxLifetime(0)
 	for i := 0; i < 20; i++ {
-		if err = db.Ping(); err == nil {
+		if err = db.PingContext(context.Background()); err == nil {
 			break
 		}
 		time.Sleep(100 * time.Millisecond)

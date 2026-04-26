@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -21,7 +22,12 @@ func TestHTTPHandlers(t *testing.T) {
 		TTLSec: 30,
 	}
 	body, _ := json.Marshal(reqObj)
-	req, err := http.NewRequest("POST", "/lock/acquire", bytes.NewBuffer(body))
+	req, err := http.NewRequestWithContext(
+		context.Background(),
+		"POST",
+		"/lock/acquire",
+		bytes.NewBuffer(body),
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -34,7 +40,12 @@ func TestHTTPHandlers(t *testing.T) {
 	}
 
 	// 測試重複發送 `acquire` 會得到 409 Conflict
-	req2, _ := http.NewRequest("POST", "/lock/acquire", bytes.NewBuffer(body))
+	req2, _ := http.NewRequestWithContext(
+		context.Background(),
+		"POST",
+		"/lock/acquire",
+		bytes.NewBuffer(body),
+	)
 	rr2 := httptest.NewRecorder()
 	acquireHandler.ServeHTTP(rr2, req2)
 
@@ -44,7 +55,12 @@ func TestHTTPHandlers(t *testing.T) {
 
 	// 測試 `extend` handler
 	extendHandler := handleExtend(store)
-	req3, _ := http.NewRequest("PATCH", "/lock/extend", bytes.NewBuffer(body))
+	req3, _ := http.NewRequestWithContext(
+		context.Background(),
+		"PATCH",
+		"/lock/extend",
+		bytes.NewBuffer(body),
+	)
 	rr3 := httptest.NewRecorder()
 	extendHandler.ServeHTTP(rr3, req3)
 

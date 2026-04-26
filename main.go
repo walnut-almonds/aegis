@@ -10,13 +10,12 @@ import (
 	"net/http"
 	"time"
 
-	"lockservice/pb"
-
 	"github.com/aws/aws-sdk-go-v2/aws"
 	awsconfig "github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/redis/go-redis/v9"
 	"github.com/spf13/viper"
+	"github.com/walnut-almonds/aegis/pb"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -78,7 +77,7 @@ func handleAcquire(store LockStorage) http.HandlerFunc {
 
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusCreated)
-		json.NewEncoder(w).Encode(lock)
+		_ = json.NewEncoder(w).Encode(lock)
 	}
 }
 
@@ -101,7 +100,7 @@ func handleRelease(store LockStorage) http.HandlerFunc {
 		}
 
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{"status": "released"}`))
+		_, _ = w.Write([]byte(`{"status": "released"}`))
 	}
 }
 
@@ -124,7 +123,7 @@ func handleExtend(store LockStorage) http.HandlerFunc {
 		}
 
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{"status": "extended"}`))
+		_, _ = w.Write([]byte(`{"status": "extended"}`))
 	}
 }
 
@@ -135,7 +134,10 @@ type grpcLockServer struct {
 	store LockStorage
 }
 
-func (s *grpcLockServer) Acquire(ctx context.Context, req *pb.LockRequest) (*pb.LockResponse, error) {
+func (s *grpcLockServer) Acquire(
+	ctx context.Context,
+	req *pb.LockRequest,
+) (*pb.LockResponse, error) {
 	domainReq := LockRequest{
 		Key:    req.Key,
 		Token:  req.Token,
@@ -155,14 +157,18 @@ func (s *grpcLockServer) Acquire(ctx context.Context, req *pb.LockRequest) (*pb.
 	}, nil
 }
 
-func (s *grpcLockServer) Release(ctx context.Context, req *pb.LockRequest) (*pb.ActionResponse, error) {
+func (s *grpcLockServer) Release(
+	ctx context.Context,
+	req *pb.LockRequest,
+) (*pb.ActionResponse, error) {
 	domainReq := LockRequest{
 		Key:   req.Key,
 		Token: req.Token,
 	}
 	err := s.store.Release(domainReq)
 	if err != nil {
-		if errors.Is(err, ErrLockNotFound) || errors.Is(err, ErrTokenMismatch) || errors.Is(err, ErrLockExpired) {
+		if errors.Is(err, ErrLockNotFound) || errors.Is(err, ErrTokenMismatch) ||
+			errors.Is(err, ErrLockExpired) {
 			return nil, status.Error(codes.PermissionDenied, err.Error())
 		}
 		return nil, status.Error(codes.Internal, err.Error())
@@ -170,7 +176,10 @@ func (s *grpcLockServer) Release(ctx context.Context, req *pb.LockRequest) (*pb.
 	return &pb.ActionResponse{Status: "released"}, nil
 }
 
-func (s *grpcLockServer) Extend(ctx context.Context, req *pb.LockRequest) (*pb.ActionResponse, error) {
+func (s *grpcLockServer) Extend(
+	ctx context.Context,
+	req *pb.LockRequest,
+) (*pb.ActionResponse, error) {
 	domainReq := LockRequest{
 		Key:    req.Key,
 		Token:  req.Token,
@@ -178,7 +187,8 @@ func (s *grpcLockServer) Extend(ctx context.Context, req *pb.LockRequest) (*pb.A
 	}
 	err := s.store.Extend(domainReq)
 	if err != nil {
-		if errors.Is(err, ErrLockNotFound) || errors.Is(err, ErrTokenMismatch) || errors.Is(err, ErrLockExpired) {
+		if errors.Is(err, ErrLockNotFound) || errors.Is(err, ErrTokenMismatch) ||
+			errors.Is(err, ErrLockExpired) {
 			return nil, status.Error(codes.PermissionDenied, err.Error())
 		}
 		return nil, status.Error(codes.Internal, err.Error())
@@ -241,7 +251,11 @@ func newStore() LockStorage {
 			}
 		})
 		tableName := viper.GetString("dynamodb.table_name")
-		log.Printf("using DynamoDB backend, table=%s region=%s", tableName, viper.GetString("dynamodb.region"))
+		log.Printf(
+			"using DynamoDB backend, table=%s region=%s",
+			tableName,
+			viper.GetString("dynamodb.region"),
+		)
 		return NewDynamoDBLockStore(client, tableName)
 
 	case "postgres":
@@ -269,7 +283,10 @@ func newStore() LockStorage {
 		return store
 
 	default:
-		log.Fatalf("unknown backend: %q (valid: redis, dynamodb, postgres, mysql)", viper.GetString("backend"))
+		log.Fatalf(
+			"unknown backend: %q (valid: redis, dynamodb, postgres, mysql)",
+			viper.GetString("backend"),
+		)
 		return nil
 	}
 }
@@ -284,7 +301,8 @@ func main() {
 
 	// 啟動 gRPC 伺服器
 	go func() {
-		lis, err := net.Listen("tcp", grpcPort)
+		var lc net.ListenConfig
+		lis, err := lc.Listen(context.Background(), "tcp", grpcPort)
 		if err != nil {
 			log.Fatalf("failed to listen: %v", err)
 		}

@@ -72,7 +72,12 @@ type Client interface {
 	Acquire(ctx context.Context, opts AcquireOptions) (*Lock, error)
 	// WithLock acquires a lock, runs fn, then releases the lock.
 	// The lock is auto-renewed for the duration of fn.
-	WithLock(ctx context.Context, key string, ttl time.Duration, fn func(ctx context.Context) error) error
+	WithLock(
+		ctx context.Context,
+		key string,
+		ttl time.Duration,
+		fn func(ctx context.Context) error,
+	) error
 	// Close closes the underlying connection.
 	Close() error
 }
@@ -187,7 +192,12 @@ func (c *baseClient) autoRenew(ctx context.Context, lock *Lock, opts AcquireOpti
 	}
 }
 
-func (c *baseClient) WithLock(ctx context.Context, key string, ttl time.Duration, fn func(ctx context.Context) error) error {
+func (c *baseClient) WithLock(
+	ctx context.Context,
+	key string,
+	ttl time.Duration,
+	fn func(ctx context.Context) error,
+) error {
 	ttlSec := int(ttl.Seconds())
 	if ttlSec <= 0 {
 		ttlSec = 30
@@ -200,6 +210,8 @@ func (c *baseClient) WithLock(ctx context.Context, key string, ttl time.Duration
 	if err != nil {
 		return fmt.Errorf("acquire lock %q: %w", key, err)
 	}
-	defer lock.Release(context.Background())
+	defer func() {
+		_ = lock.Release(context.Background())
+	}()
 	return fn(ctx)
 }

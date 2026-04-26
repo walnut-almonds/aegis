@@ -9,9 +9,8 @@ import (
 	"testing"
 	"time"
 
-	"lockservice/pb"
-	"lockservice/sdk/lockclient"
-
+	"github.com/walnut-almonds/aegis/pb"
+	"github.com/walnut-almonds/aegis/sdk/go/lockclient"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -56,7 +55,11 @@ func TestHTTPClient_Acquire(t *testing.T) {
 	defer ts.Close()
 
 	client := lockclient.NewHTTPClient(ts.URL, 2*time.Second)
-	defer client.Close()
+	defer func() {
+		if err := client.Close(); err != nil {
+			t.Errorf("close failed: %v", err)
+		}
+	}()
 
 	lock, err := client.Acquire(context.Background(), lockclient.AcquireOptions{
 		Key:    "test_key",
@@ -79,14 +82,16 @@ func TestHTTPClient_Acquire(t *testing.T) {
 func TestHTTPClient_WithLock(t *testing.T) {
 	var acquireCalled, releaseCalled bool
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		switch {
-		case r.URL.Path == "/lock/acquire":
+		switch r.URL.Path {
+		case "/lock/acquire":
 			acquireCalled = true
 			var req struct {
 				Key   string `json:"key"`
 				Token string `json:"token"`
 			}
-			json.NewDecoder(r.Body).Decode(&req)
+			if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+				t.Fatalf("decode failed: %v", err)
+			}
 			res := struct {
 				Key       string    `json:"key"`
 				Token     string    `json:"token"`
@@ -94,10 +99,10 @@ func TestHTTPClient_WithLock(t *testing.T) {
 			}{Key: req.Key, Token: req.Token, ExpiredAt: time.Now().Add(30 * time.Second)}
 			w.Header().Set("Content-Type", "application/json")
 			json.NewEncoder(w).Encode(res)
-		case r.URL.Path == "/lock/release":
+		case "/lock/release":
 			releaseCalled = true
 			w.Write([]byte(`{}`))
-		case r.URL.Path == "/lock/extend":
+		case "/lock/extend":
 			w.Write([]byte(`{}`))
 		default:
 			w.WriteHeader(http.StatusNotFound)
@@ -106,13 +111,22 @@ func TestHTTPClient_WithLock(t *testing.T) {
 	defer ts.Close()
 
 	client := lockclient.NewHTTPClient(ts.URL, 2*time.Second)
-	defer client.Close()
+	defer func() {
+		if err := client.Close(); err != nil {
+			t.Errorf("close failed: %v", err)
+		}
+	}()
 
 	fnCalled := false
-	err := client.WithLock(context.Background(), "resource", 5*time.Second, func(ctx context.Context) error {
-		fnCalled = true
-		return nil
-	})
+	err := client.WithLock(
+		context.Background(),
+		"resource",
+		5*time.Second,
+		func(ctx context.Context) error {
+			fnCalled = true
+			return nil
+		},
+	)
 	if err != nil {
 		t.Fatalf("WithLock failed: %v", err)
 	}
@@ -130,8 +144,8 @@ func TestHTTPClient_WithLock(t *testing.T) {
 func TestHTTPClient_Retry(t *testing.T) {
 	attempts := 0
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		switch {
-		case r.URL.Path == "/lock/acquire":
+		switch r.URL.Path {
+		case "/lock/acquire":
 			attempts++
 			if attempts < 3 {
 				http.Error(w, "conflict", http.StatusConflict)
@@ -141,7 +155,9 @@ func TestHTTPClient_Retry(t *testing.T) {
 				Key   string `json:"key"`
 				Token string `json:"token"`
 			}
-			json.NewDecoder(r.Body).Decode(&req)
+			if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+				t.Fatalf("decode failed: %v", err)
+			}
 			res := struct {
 				Key       string    `json:"key"`
 				Token     string    `json:"token"`
@@ -149,14 +165,18 @@ func TestHTTPClient_Retry(t *testing.T) {
 			}{Key: req.Key, Token: req.Token, ExpiredAt: time.Now().Add(10 * time.Second)}
 			w.Header().Set("Content-Type", "application/json")
 			json.NewEncoder(w).Encode(res)
-		case r.URL.Path == "/lock/release":
+		case "/lock/release":
 			w.Write([]byte(`{}`))
 		}
 	}))
 	defer ts.Close()
 
 	client := lockclient.NewHTTPClient(ts.URL, 2*time.Second)
-	defer client.Close()
+	defer func() {
+		if err := client.Close(); err != nil {
+			t.Errorf("close failed: %v", err)
+		}
+	}()
 
 	lock, err := client.Acquire(context.Background(), lockclient.AcquireOptions{
 		Key:           "retry_key",
@@ -170,7 +190,9 @@ func TestHTTPClient_Retry(t *testing.T) {
 	if attempts != 3 {
 		t.Errorf("expected 3 attempts, got %d", attempts)
 	}
-	lock.Release(context.Background())
+	if err := lock.Release(context.Background()); err != nil {
+		t.Errorf("release failed: %v", err)
+	}
 }
 
 // --- gRPC Client Tests ---
@@ -179,7 +201,10 @@ type mockGRPCServer struct {
 	pb.UnimplementedLockServiceServer
 }
 
-func (m *mockGRPCServer) Acquire(ctx context.Context, req *pb.LockRequest) (*pb.LockResponse, error) {
+func (m *mockGRPCServer) Acquire(
+	ctx context.Context,
+	req *pb.LockRequest,
+) (*pb.LockResponse, error) {
 	if req.Key == "fail" {
 		return nil, status.Error(codes.AlreadyExists, "lock already exists")
 	}
@@ -190,37 +215,42 @@ func (m *mockGRPCServer) Acquire(ctx context.Context, req *pb.LockRequest) (*pb.
 	}, nil
 }
 
-func (m *mockGRPCServer) Release(ctx context.Context, req *pb.LockRequest) (*pb.ActionResponse, error) {
+func (m *mockGRPCServer) Release(
+	ctx context.Context,
+	req *pb.LockRequest,
+) (*pb.ActionResponse, error) {
 	return &pb.ActionResponse{Status: "released"}, nil
 }
 
-func (m *mockGRPCServer) Extend(ctx context.Context, req *pb.LockRequest) (*pb.ActionResponse, error) {
+func (m *mockGRPCServer) Extend(
+	ctx context.Context,
+	req *pb.LockRequest,
+) (*pb.ActionResponse, error) {
 	return &pb.ActionResponse{Status: "extended"}, nil
 }
 
 func startMockGRPC(t *testing.T) (lockclient.Client, func()) {
 	t.Helper()
-	lis, err := net.Listen("tcp", "127.0.0.1:0")
+	var lc net.ListenConfig
+	lis, err := lc.Listen(context.Background(), "tcp", "127.0.0.1:0")
 	if err != nil {
 		t.Fatalf("failed to listen: %v", err)
 	}
 	s := grpc.NewServer()
 	pb.RegisterLockServiceServer(s, &mockGRPCServer{})
 	go func() {
-		if err := s.Serve(lis); err != nil {
-			// server stopped normally
-		}
+		_ = s.Serve(lis)
 	}()
 	client, err := lockclient.NewGRPCClient(context.Background(), lis.Addr().String())
 	if err != nil {
 		s.Stop()
-		lis.Close()
+		_ = lis.Close()
 		t.Fatalf("failed to create client: %v", err)
 	}
 	return client, func() {
-		client.Close()
+		_ = client.Close()
 		s.Stop()
-		lis.Close()
+		_ = lis.Close()
 	}
 }
 
@@ -265,10 +295,15 @@ func TestGRPCClient_WithLock(t *testing.T) {
 	defer cleanup()
 
 	called := false
-	err := client.WithLock(context.Background(), "resource", 5*time.Second, func(ctx context.Context) error {
-		called = true
-		return nil
-	})
+	err := client.WithLock(
+		context.Background(),
+		"resource",
+		5*time.Second,
+		func(ctx context.Context) error {
+			called = true
+			return nil
+		},
+	)
 	if err != nil {
 		t.Fatalf("WithLock failed: %v", err)
 	}

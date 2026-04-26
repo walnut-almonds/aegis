@@ -3,9 +3,9 @@ package lockclient
 import (
 	"context"
 	"fmt"
-	"lockservice/pb"
 	"time"
 
+	"github.com/walnut-almonds/aegis/pb"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 )
@@ -17,7 +17,13 @@ type grpcTransport struct {
 
 // NewGRPCClient creates a Client backed by gRPC transport.
 func NewGRPCClient(ctx context.Context, target string) (Client, error) {
-	conn, err := grpc.DialContext(ctx, target, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	conn, err := grpc.NewClient(
+		target,
+		grpc.WithTransportCredentials(insecure.NewCredentials()),
+	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to dial target %s: %w", target, err)
 	}
@@ -28,7 +34,11 @@ func NewGRPCClient(ctx context.Context, target string) (Client, error) {
 	return newClient(t), nil
 }
 
-func (t *grpcTransport) acquire(ctx context.Context, key, token string, ttlSec int) (*LockResponse, error) {
+func (t *grpcTransport) acquire(
+	ctx context.Context,
+	key, token string,
+	ttlSec int,
+) (*LockResponse, error) {
 	res, err := t.client.Acquire(ctx, &pb.LockRequest{
 		Key:    key,
 		Token:  token,

@@ -23,11 +23,16 @@ func (s *RedisLockStore) Acquire(req LockRequest) (*Lock, error) {
 	ttl := time.Duration(req.TTLSec) * time.Second
 
 	// Redis 的 SET key value NX PX ttl 達成了原子性「如果不存在才寫入並設定過期時間」
-	ok, err := s.client.SetNX(ctx, req.Key, req.Token, ttl).Result()
+	res, err := s.client.SetArgs(ctx, req.Key, req.Token, redis.SetArgs{Mode: "NX", TTL: ttl}).
+		Result()
+	if err == redis.Nil {
+		err = nil
+		res = ""
+	}
 	if err != nil {
 		return nil, err
 	}
-	if !ok {
+	if res != "OK" {
 		return nil, ErrLockAlreadyExists
 	}
 

@@ -39,8 +39,17 @@ type lockRespPayload struct {
 	ExpiredAt time.Time `json:"expired_at"`
 }
 
-func (t *httpTransport) acquire(ctx context.Context, key, token string, ttlSec int) (*LockResponse, error) {
-	body, err := t.doReq(ctx, http.MethodPost, "/lock/acquire", lockPayload{Key: key, Token: token, TTLSec: ttlSec})
+func (t *httpTransport) acquire(
+	ctx context.Context,
+	key, token string,
+	ttlSec int,
+) (*LockResponse, error) {
+	body, err := t.doReq(
+		ctx,
+		http.MethodPost,
+		"/lock/acquire",
+		lockPayload{Key: key, Token: token, TTLSec: ttlSec},
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -57,18 +66,32 @@ func (t *httpTransport) release(ctx context.Context, key, token string) error {
 }
 
 func (t *httpTransport) extend(ctx context.Context, key, token string, ttlSec int) error {
-	_, err := t.doReq(ctx, http.MethodPost, "/lock/extend", lockPayload{Key: key, Token: token, TTLSec: ttlSec})
+	_, err := t.doReq(
+		ctx,
+		http.MethodPost,
+		"/lock/extend",
+		lockPayload{Key: key, Token: token, TTLSec: ttlSec},
+	)
 	return err
 }
 
 func (t *httpTransport) close() error { return nil }
 
-func (t *httpTransport) doReq(ctx context.Context, method, path string, payload interface{}) ([]byte, error) {
+func (t *httpTransport) doReq(
+	ctx context.Context,
+	method, path string,
+	payload any,
+) ([]byte, error) {
 	reqBytes, err := json.Marshal(payload)
 	if err != nil {
 		return nil, fmt.Errorf("failed to encode request: %w", err)
 	}
-	httpReq, err := http.NewRequestWithContext(ctx, method, t.baseURL+path, bytes.NewReader(reqBytes))
+	httpReq, err := http.NewRequestWithContext(
+		ctx,
+		method,
+		t.baseURL+path,
+		bytes.NewReader(reqBytes),
+	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
@@ -77,7 +100,9 @@ func (t *httpTransport) doReq(ctx context.Context, method, path string, payload 
 	if err != nil {
 		return nil, fmt.Errorf("http request failed: %w", err)
 	}
-	defer res.Body.Close()
+	defer func() {
+		_ = res.Body.Close()
+	}()
 	body, err := io.ReadAll(res.Body)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read response: %w", err)

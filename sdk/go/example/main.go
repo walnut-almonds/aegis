@@ -19,7 +19,7 @@ import (
 	"sync"
 	"time"
 
-	"lockservice/sdk/lockclient"
+	"github.com/walnut-almonds/aegis/sdk/go/lockclient"
 )
 
 const (
@@ -30,7 +30,11 @@ const (
 func main() {
 	// ── HTTP client ──────────────────────────────────────────────────────────
 	httpClient := lockclient.NewHTTPClient(httpAddr, 5*time.Second)
-	defer httpClient.Close()
+	defer func() {
+		if err := httpClient.Close(); err != nil {
+			log.Printf("[HTTP] close failed: %v", err)
+		}
+	}()
 
 	scenario1_BasicAcquireRelease(httpClient)
 	scenario2_AcquireWithRetry(httpClient)
@@ -47,7 +51,7 @@ func main() {
 		log.Printf("[gRPC] failed to create client: %v", err)
 		return
 	}
-	defer grpcClient.Close()
+	defer func() { _ = grpcClient.Close() }()
 
 	scenario8_GRPCBasic(grpcClient)
 }
@@ -98,7 +102,7 @@ func scenario2_AcquireWithRetry(c lockclient.Client) {
 		log.Printf("acquire with retry failed: %v", err)
 		return
 	}
-	defer lock.Release(ctx) // 確保一定會釋放
+	defer func() { _ = lock.Release(ctx) }() // 確保一定會釋放
 
 	fmt.Printf("  acquired after retry  key=%s\n", lock.Key)
 	doWork("check inventory")
@@ -119,7 +123,7 @@ func scenario3_ManualExtend(c lockclient.Client) {
 		log.Printf("acquire failed: %v", err)
 		return
 	}
-	defer lock.Release(ctx)
+	defer func() { _ = lock.Release(ctx) }()
 
 	fmt.Printf("  acquired  expires=%s\n", lock.ExpiredAt.Format(time.RFC3339))
 
@@ -250,7 +254,11 @@ func scenario7_ContextTimeout(c lockclient.Client) {
 		return
 	}
 	// 如果鎖立刻可用就正常使用
-	defer lock.Release(context.Background())
+	defer func() {
+		if err := lock.Release(context.Background()); err != nil {
+			log.Printf("release failed: %v", err)
+		}
+	}()
 	fmt.Printf("  acquired key=%s\n", lock.Key)
 }
 

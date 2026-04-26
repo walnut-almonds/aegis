@@ -10,18 +10,19 @@ import (
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
-	"github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/modules/localstack"
 )
 
-func setupTestDynamoDB(t *testing.T, tableName string) (*localstack.LocalStackContainer, *DynamoDBLockStore) {
+func setupTestDynamoDB(
+	t *testing.T,
+	tableName string,
+) (*localstack.LocalStackContainer, *DynamoDBLockStore) {
 	ctx := context.Background()
 
-	container, err := localstack.RunContainer(ctx, testcontainers.CustomizeRequest(testcontainers.GenericContainerRequest{
-		ContainerRequest: testcontainers.ContainerRequest{
-			Image: "localstack/localstack:3.0.0",
-		},
-	}))
+	container, err := localstack.Run(
+		ctx,
+		"localstack/localstack:3.0.0",
+	)
 	if err != nil {
 		t.Fatalf("failed to start localstack: %s", err)
 	}
@@ -32,9 +33,12 @@ func setupTestDynamoDB(t *testing.T, tableName string) (*localstack.LocalStackCo
 	}
 	endpoint := "http://" + provider
 
-	cfg, err := config.LoadDefaultConfig(ctx,
+	cfg, err := config.LoadDefaultConfig(
+		ctx,
 		config.WithRegion("us-east-1"),
-		config.WithCredentialsProvider(credentials.NewStaticCredentialsProvider("test", "test", "")),
+		config.WithCredentialsProvider(
+			credentials.NewStaticCredentialsProvider("test", "test", ""),
+		),
 	)
 	if err != nil {
 		t.Fatalf("failed to load aws config: %s", err)
@@ -63,7 +67,7 @@ func setupTestDynamoDB(t *testing.T, tableName string) (*localstack.LocalStackCo
 
 func TestDynamoDBLockStore_Acquire_Release_Extend(t *testing.T) {
 	container, store := setupTestDynamoDB(t, "DistLocks1")
-	defer container.Terminate(context.Background())
+	defer func() { _ = container.Terminate(context.Background()) }()
 
 	req1 := LockRequest{
 		Key:    "test:lock:1",
@@ -117,7 +121,7 @@ func TestDynamoDBLockStore_Acquire_Release_Extend(t *testing.T) {
 
 func TestDynamoDBLockStore_TTL_Expiration(t *testing.T) {
 	container, store := setupTestDynamoDB(t, "DistLocks2")
-	defer container.Terminate(context.Background())
+	defer func() { _ = container.Terminate(context.Background()) }()
 
 	req := LockRequest{
 		Key:    "test:lock:ttl",
