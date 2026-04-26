@@ -1,0 +1,25 @@
+# Version control
+.git
+.gitignore
+
+# CI/CD
+.github
+
+# Go test artifacts
+**/*_test.go
+coverage.out
+
+# Docs / plans
+*.md
+plan.md
+planMin.md
+todolist.md
+
+# Local dev overrides (users mount their own config at runtime)
+# config.yaml  ← intentionally NOT ignored so it ships as the default
+
+# IDE / OS
+.vscode
+.idea
+*.DS_Store
+Thumbs.db

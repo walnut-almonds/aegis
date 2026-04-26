@@ -1,6 +1,28 @@
 version: '3.8'
 
 services:
+  aegis:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: ghcr.io/${GITHUB_REPOSITORY:-local/aegis}:latest
+    container_name: aegis-server
+    ports:
+      - "8080:8080"
+      - "50051:50051"
+    volumes:
+      - ./config.yaml:/config.yaml:ro
+    depends_on:
+      redis:
+        condition: service_started
+      postgres:
+        condition: service_healthy
+      mysql:
+        condition: service_healthy
+    restart: unless-stopped
+    environment:
+      - TZ=UTC
+
   redis:
     image: redis:7-alpine
     container_name: aegis-redis
