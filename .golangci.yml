@@ -43,11 +43,12 @@ linters:
           disabled: true     # pb/ generated code has inconsistent doc comments
 
 issues:
-  exclude-rules:
-    # Test files: relax errcheck and a few noisy rules
-    - path: _test\.go
-      linters: [errcheck, revive]
+  exclusions:
+    rules:
+      # Test files: relax errcheck and a few noisy rules
+      - path: _test\.go
+        linters: [errcheck, revive]
 
-    # Generated protobuf files
-    - path: pb/
-      linters: [revive, staticcheck, unused]
+      # Generated protobuf files
+      - path: pb/
+        linters: [revive, staticcheck, unused]
